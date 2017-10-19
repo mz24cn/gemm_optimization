@@ -216,10 +216,10 @@ T gemm_opt()
 						kernel.setArg(3, nullptr);
 						kernel.setArg(4, m);
 						kernel.setArg(5, k);
-//						int local_size = find_proper_local_size(k, I.work_group_size);
-//						if (local_size > m * n)
-//							local_size = m * n;
-						cl::NDRange local(32, 32);
+						int local_size = find_proper_local_size(k, I.work_group_size);
+						if (local_size > m * n)
+							local_size = m * n;
+						const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
 						cl::NDRange global(m, n);
 						I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
 						if (!parallel)
@@ -227,6 +227,8 @@ T gemm_opt()
 					}
 //					operate_tensor_data<float>(&result, I, {0, 0}, {2, 4}, result.dimensions);
 				}, [m, n, k](InstantTensor* self, DeviceInstance& I) -> string {
+					if (cl_build_options.find("-DTS=") == string::npos)
+						cl_build_options += "-DTS=" + to_string(I.work_group_size <= 256? 16 : 32);
 					string content;
 					read_file_content<char>(OpenCL.location + "src/revised.cl", content);
 					return content;
