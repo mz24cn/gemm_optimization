@@ -27,6 +27,11 @@
 								<option id="gnu.cpp.compiler.option.include.paths.1225369731" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;D:\Program Files\NVIDIA_CUDA\include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;D:\Program Files\IntelMKL\compilers_and_libraries\windows\mkl\include&quot;"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.preprocessor.def.1432027541" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="CUBLAS_ENABLE"/>
+									<listOptionValue builtIn="false" value="MKL_ENABLE"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1628754465" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -37,10 +42,10 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug.88764195" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.debug"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.854680310" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug">
-								<option id="gnu.cpp.link.option.paths.1554225535" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+								<option id="gnu.cpp.link.option.paths.1554225535" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib}&quot;"/>
 								</option>
-								<option id="gnu.cpp.link.option.libs.2083591947" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
+								<option id="gnu.cpp.link.option.libs.2083591947" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCL"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCLNet"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="clblast"/>
@@ -48,6 +53,7 @@
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cublas64_80"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gomp"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="libclBLAS"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="mkl_rt"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1763833207" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -106,6 +112,11 @@
 								<option id="gnu.cpp.compiler.option.include.paths.449802032" name="Include paths (-I)" superClass="gnu.cpp.compiler.option.include.paths" useByScannerDiscovery="false" valueType="includePath">
 									<listOptionValue builtIn="false" value="&quot;D:\Program Files\NVIDIA_CUDA\include&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/include}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;D:\Program Files\IntelMKL\compilers_and_libraries\windows\mkl\include&quot;"/>
+								</option>
+								<option id="gnu.cpp.compiler.option.preprocessor.def.2049765670" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="MKL_ENABLE"/>
+									<listOptionValue builtIn="false" value="CUBLAS_ENABLE"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2096357213" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
@@ -116,17 +127,18 @@
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release.1382533207" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release.1945276392" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release">
-								<option id="gnu.cpp.link.option.paths.678952114" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+								<option id="gnu.cpp.link.option.paths.678952114" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib}&quot;"/>
 								</option>
-								<option id="gnu.cpp.link.option.libs.974022051" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" valueType="libs">
-									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCL"/>
+								<option id="gnu.cpp.link.option.libs.974022051" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCLNet"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCL"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="clblast"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cudart64_80"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cublas64_80"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gomp"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="libclBLAS"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="mkl_rt"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.683299615" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
