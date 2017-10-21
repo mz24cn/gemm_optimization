@@ -15,6 +15,9 @@
 #endif
 #include <clblast.h>
 #include <clBLAS.h>
+#ifdef MIOPENGEMM_ENABLE
+#include <miopengemm/gemm.hpp>
+#endif
 #ifdef MKL_ENABLE
 #include <mkl.h>
 #endif
@@ -51,6 +54,7 @@ T gemm_opt()
 	bool cublas = optional<int>("cublas", false);
 	bool clblast = optional<int>("clblast", false);
 	bool clBLAS = optional<int>("clblas", false);
+	bool MIOpen = optional<int>("miopen", false);
 	bool MKL = optional<int>("mkl", false);
 	bool verify = optional<int>("verify", false);
 	logger << "Compared with ";
@@ -60,6 +64,8 @@ T gemm_opt()
 		logger << "cublas";
 	else if (clBLAS)
 		logger << "clBLAS";
+	else if (MIOpen)
+		logger << "MIOpenGemm";
 	else if (MKL)
 		logger << "Intel MKL";
 	else
@@ -73,7 +79,7 @@ T gemm_opt()
 	T result = Data({M, N}, nullptr, "gemm");
 
 	T graph = *new InstantTensor("gemm_opt", {&x, &w},
-		[M, N, K, STEP, REPEAT, parallel, &result, &initializer, cublas, clBLAS, MKL, verify](InstantTensor* self, DeviceInstance& I) {
+		[M, N, K, STEP, REPEAT, parallel, &result, &initializer, cublas, clBLAS, MIOpen, MKL, verify](InstantTensor* self, DeviceInstance& I) {
 		auto& kernel = prepare_for_running_kernel(self, I);
 		T x = *self->inputs[0];
 		T w = *self->inputs[1];
@@ -177,7 +183,7 @@ T gemm_opt()
 	for (int m = M; m >= 32; m /= STEP)
 		for (int n = N; n >= 32; n /= STEP)
 			for (int  k = K; k >= 32; k /= STEP)
-				graph.peers.push_back(new InstantTensor("tiling_" + to_string(m)  + "_" + to_string(n) + "_" + to_string(k), {&x, &w}, {}, [m, n, k, parallel, &result, clblast, cublas, clBLAS, MKL](InstantTensor* self, DeviceInstance& I) {
+				graph.peers.push_back(new InstantTensor("tiling_" + to_string(m)  + "_" + to_string(n) + "_" + to_string(k), {&x, &w}, {}, [m, n, k, parallel, &result, clblast, cublas, clBLAS, MIOpen, MKL](InstantTensor* self, DeviceInstance& I) {
 					T x = *self->inputs[0];
 					T w = *self->inputs[1];
 
@@ -203,6 +209,14 @@ T gemm_opt()
 						if (err != CL_SUCCESS)
 							throw runtime_error("clBLAS error: " + to_string((int) err));
 					}
+#ifdef MIOPENGEMM_ENABLE
+					else if (MIOpen) {
+						auto stat = MIOpenGEMM::gemm0<float>(true, false, false, m, n, k, alpha, I.buffers[&w](), 0, m,
+								I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
+						if (!stat.success)
+							throw runtime_error("MIOpenGemm error: " + to_string(stat.ID));
+					}
+#endif
 #ifdef MKL_ENABLE
 					else if (MKL) {
 						cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, I.pointers[&w], m, I.pointers[&x], k, beta, I.pointers[&result], m);

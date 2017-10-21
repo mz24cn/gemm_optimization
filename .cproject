@@ -29,8 +29,9 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;D:\Program Files\IntelMKL\compilers_and_libraries\windows\mkl\include&quot;"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.preprocessor.def.1432027541" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.cpp.compiler.option.preprocessor.def.1432027541" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="CUBLAS_ENABLE"/>
+									<listOptionValue builtIn="false" value="MIOPENGEMM_ENABLE"/>
 									<listOptionValue builtIn="false" value="MKL_ENABLE"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1628754465" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -54,6 +55,7 @@
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gomp"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="libclBLAS"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="mkl_rt"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="miopengemm"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1763833207" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
@@ -114,8 +116,9 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/include}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;D:\Program Files\IntelMKL\compilers_and_libraries\windows\mkl\include&quot;"/>
 								</option>
-								<option id="gnu.cpp.compiler.option.preprocessor.def.2049765670" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
+								<option id="gnu.cpp.compiler.option.preprocessor.def.2049765670" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="MKL_ENABLE"/>
+									<listOptionValue builtIn="false" value="MIOPENGEMM_ENABLE"/>
 									<listOptionValue builtIn="false" value="CUBLAS_ENABLE"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2096357213" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -139,6 +142,7 @@
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="gomp"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="libclBLAS"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="mkl_rt"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="miopengemm"/>
 								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.683299615" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
