@@ -104,13 +104,17 @@ T gemm_opt()
 			for (int n = N; n >= 32; n /= STEP)
 				for (int  k = K; k >= 32; k /= STEP) {
 					int64 total = (sqrt(REPEAT * M * N * K / m / n / k) - 0.8) * 50;
-					size_t time = MICROS(0);
 					logger << "M=" << m << " \tN=" << n << " \tK=" << k << " \ttimes=" << total << flush;
+					//warm up
+					kernel.setArg(4, m);
+					kernel.setArg(5, k);
+					cl::NDRange global(m * n);
+					I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, cl::NullRange, &I.precondition_events, &I.events[&result]);
+					wait_for_all_kernels_finished(I);
 
+					//timing the standard version now......
+					size_t time = MICROS(0);
 					for (int j = 0; j < total; j++) {
-						kernel.setArg(4, m);
-						kernel.setArg(5, k);
-						cl::NDRange global(m * n);
 						I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, cl::NullRange, &I.precondition_events, &I.events[&result]);
 						if (!parallel)
 							wait_for_all_kernels_finished(I);
@@ -118,6 +122,8 @@ T gemm_opt()
 					if (parallel)
 						wait_for_all_kernels_finished(I);
 					time = MICROS(time);
+					//end timing-----------------------------
+
 					float baseline = time / total / 1000.0f;
 					if (verify) {
 						result.upload(I);
@@ -126,7 +132,10 @@ T gemm_opt()
 					logger << " \tTime=" << time / 1000.0f << "/" << baseline << flush;
 //					operate_tensor_data<float>(&result, I, {0, 0}, {1, 9}, result.dimensions, "2");
 
-					//Run second version:
+					//warm up
+					self->peers[i]->run(I);
+
+					//timing the second version now......
 					size_t time2 = MICROS(0);
 					for (int j = 0; j < total; j++)
 						self->peers[i]->run(I);
@@ -139,6 +148,8 @@ T gemm_opt()
 							wait_for_all_kernels_finished(I);
 					}
 					time2 = MICROS(time2);
+					//end timing-----------------------------
+
 					float compared = time2 / total / 1000.0f;
 					float delta = 0;
 					if (verify) {
