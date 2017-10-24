@@ -47,8 +47,8 @@
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib}&quot;"/>
 								</option>
 								<option id="gnu.cpp.link.option.libs.2083591947" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
-									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCL"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCLNet"/>
+									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCL"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="clblast"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cudart64_80"/>
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="cublas64_80"/>

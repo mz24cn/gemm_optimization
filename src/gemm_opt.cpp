@@ -27,13 +27,16 @@
 
 using namespace std;
 using namespace clnet;
-using namespace clblast;
+
+int m, n, k;
+bool parallel;
+float alpha = 0;
+float beta = 0;
+Tensor *baseline = nullptr, *clBLAS = nullptr, *clBLAST = nullptr, *cublas = nullptr, *MKL = nullptr, *MIOpen = nullptr, *revised = nullptr;
 
 float* bufA = 0;
 float* bufB = 0;
 float* bufC = 0;
-float alpha = 0;
-float beta = 0;
 #ifdef CUBLAS_ENABLE
 cublasHandle_t handle;
 #endif
@@ -46,222 +49,233 @@ T gemm_opt()
 	int K = optional<int>("K", 2048); //dim_in
 	int STEP = optional<int>("step", 4);
 
-	double REPEAT = optional<double>("repeat", 1.0);
 	alpha = optional<double>("alpha", 1.0);
 	beta = optional<double>("beta", 0);
+	parallel = optional<int>("parallel", false);
 
-	bool parallel = optional<int>("parallel", false);
-	bool cublas = optional<int>("cublas", false);
-	bool clblast = optional<int>("clblast", false);
-	bool clBLAS = optional<int>("clblas", false);
-	bool MIOpen = optional<int>("miopen", false);
-	bool MKL = optional<int>("mkl", false);
+	double REPEAT = optional<double>("repeat", 1.0);
 	bool verify = optional<int>("verify", false);
-	logger << "Compared with ";
-	if (clblast)
-		logger << "clblast";
-	else if (cublas)
-		logger << "cublas";
-	else if (clBLAS)
-		logger << "clBLAS";
-	else if (MIOpen)
-		logger << "MIOpenGemm";
-	else if (MKL)
-		logger << "Intel MKL";
-	else
-		logger << "revised clNET kernel";
-	logger << ", Verification " << (verify? "enabled" : "disabled");
-	logger << ", Parallel " << (parallel? "enabled" : "disabled");
-	logger << endl;
+	bool debug = optional<int>("debug", false);
 
 	T w = Weight({M, K}, "w", &initializer);
 	T x = Data({N, K}, &initializer, "x");
 	T result = Data({M, N}, nullptr, "gemm");
-
-	T graph = *new InstantTensor("gemm_opt", {&x, &w},
-		[M, N, K, STEP, REPEAT, parallel, &result, &initializer, cublas, clBLAS, MIOpen, MKL, verify](InstantTensor* self, DeviceInstance& I) {
-		auto& kernel = prepare_for_running_kernel(self, I);
-		T x = *self->inputs[0];
-		T w = *self->inputs[1];
-		kernel.setArg(0, I.buffers[&result]);
-		kernel.setArg(1, I.buffers[&x]);
-		kernel.setArg(2, I.buffers[&w]);
-		kernel.setArg(3, nullptr);
-
+	T graph = *new InstantTensor("gemm_loop_tester", {&x, &w},
+		[M, N, K, STEP, REPEAT, &x, &w, &result, &initializer, verify, debug](InstantTensor* self, DeviceInstance& I) {
 #ifdef CUBLAS_ENABLE
 		extern void prepare_cublas(float* A, float* B, float* C, int K, int M, int N);
 		if (cublas)
 			prepare_cublas(w.pointer, x.pointer, result.pointer, K, M, N);
 #endif
-		if (clBLAS) {
-			auto err = clblasSetup();
-			if (err != CL_SUCCESS)
-				throw runtime_error("clBLAS error: " + to_string((int) err));
-		}
 
-		int i = 0;
-		for (int m = M; m >= 32; m /= STEP)
-			for (int n = N; n >= 32; n /= STEP)
-				for (int  k = K; k >= 32; k /= STEP) {
+		for (m = M; m >= 32; m /= STEP)
+			for (n = N; n >= 32; n /= STEP)
+				for (k = K; k >= 32; k /= STEP) {
 					int64 total = (sqrt(REPEAT * M * N * K / m / n / k) - 0.8) * 50;
 					logger << "M=" << m << " \tN=" << n << " \tK=" << k << " \ttimes=" << total << flush;
-					//warm up
-					kernel.setArg(4, m);
-					kernel.setArg(5, k);
-					cl::NDRange global(m * n);
-					I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, cl::NullRange, &I.precondition_events, &I.events[&result]);
-					wait_for_all_kernels_finished(I);
 
-					//timing the standard version now......
-					size_t time = MICROS(0);
-					for (int j = 0; j < total; j++) {
-						I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, cl::NullRange, &I.precondition_events, &I.events[&result]);
-						if (!parallel)
+					size_t minimum = INT_MAX, baseline_time = 0;
+					Tensor* minimum_tensor = nullptr;
+					for (auto tensor : self->peers) {
+						size_t time = 0;
+						try {
+							logger << " \t" << tensor->alias << "=";
+							//warm up
+							tensor->run(I);
 							wait_for_all_kernels_finished(I);
-					}
-					if (parallel)
-						wait_for_all_kernels_finished(I);
-					time = MICROS(time);
-					//end timing-----------------------------
 
-					float baseline = time / 1000.0f / total;
-					if (verify) {
-						result.upload(I);
-						memcpy(result.pointer, I.pointers[&result], m * n * sizeof(float));
-					}
-					logger << " \tTime=" << time / 1000.0f << "/" << baseline << flush;
-//					operate_tensor_data<float>(&result, I, {0, 0}, {1, 9}, result.dimensions, "2");
-
-					//warm up
-					self->peers[i]->run(I);
-
-					//timing the second version now......
-					size_t time2 = MICROS(0);
-					for (int j = 0; j < total; j++)
-						self->peers[i]->run(I);
-					if (parallel) {
+							//timing the standard version now......
+							time = MICROS(0);
+							for (int j = 0; j < total; j++)
+								tensor->run(I);
+							if (parallel) {
 #ifdef CUBLAS_ENABLE
-						if (cublas)
-							cudaDeviceSynchronize();
-						else
+								if (tensor == cublas)
+									cudaDeviceSynchronize();
+								else
 #endif
-							wait_for_all_kernels_finished(I);
-					}
-					time2 = MICROS(time2);
-					//end timing-----------------------------
+								if (tensor != MKL)
+									wait_for_all_kernels_finished(I);
+							}
+							time = MICROS(time);
+							//end timing-----------------------------
 
-					float compared = time2 / 1000.0f / total;
-					float delta = 0;
-					if (verify) {
-#ifdef CUBLAS_ENABLE
-						if (cublas)
-							cudaMemcpy((void*)I.pointers[&result], (void*)bufC, result.size, cudaMemcpyDeviceToHost);
-						else
-#endif
-						if (!MKL) //For MKL, data has stored in I.pointers[&result]
-							result.upload(I);
-						auto p1 = result.pointer, p2 = I.pointers[&result];
-						for (int j = 0; j < m * n; j ++, p1++, p2++) { //validiate the correction
-							float diff = *p1 - *p2;
-							delta += diff * diff;
+							float each = time / 1000.0f / total;
+							if (minimum > time) {
+								minimum = time;
+								minimum_tensor = tensor;
+							}
+							if (tensor == baseline)
+								baseline_time = time;
+							logger << time / 1000.0f << "/" << each;
+							if (verify) {
+								float delta = 0;
+								if (tensor != MKL) //For MKL, data has stored in I.pointers[&result]
+									result.upload(I);
+//								operate_tensor_data<float>(&result, I, {0, 0}, result.dimensions, result.dimensions, "1"); //check the value details
+								if (tensor == baseline)
+									memcpy(result.pointer, I.pointers[&result], m * n * sizeof(float));
+								else {
+									auto p1 = result.pointer, p2 = I.pointers[&result];
+									for (int j = 0; j < m * n; j ++, p1++, p2++) { //validiate the correction
+										float diff = *p1 - *p2;
+										delta += diff * diff;
+									}
+									logger << "(delta=" << delta << ")";
+								}
+							}
+							if (baseline != nullptr)
+								logger << "/" << 1.0f * baseline_time / time;
 						}
+						catch (cl::Error& e) {
+							logger << (debug? e.what() : "error");
+						}
+						catch (runtime_error& e) {
+							logger << (debug? e.what() : "error");
+						}
+						logger << flush;
 					}
-//					operate_tensor_data<float>(&result, I, {0, 0}, {1, 9}, result.dimensions, "1");
-
-					logger << ", " << time2 / 1000.0f << "/" << compared << "ms \tSpeedUp=" << baseline / compared;
-					if (verify)
-						logger << " \tdelta=" << delta;
+					if (self->peers.size() > 1)
+						logger << " \tWin=" << minimum_tensor->alias;
 					logger << endl;
-					i++;
 				}
 
 #ifdef CUBLAS_ENABLE
 		extern void shutdown_cublas();
-		if (cublas)
+		if (cublas != nullptr)
 			shutdown_cublas();
 #endif
-		if (clBLAS)
+		if (clBLAS != nullptr)
 			clblasTeardown();
 	}, {},
 	[](InstantTensor* self) -> Tensor* { return nullptr; },
-	[](InstantTensor* self) -> std::vector<Tensor*> { return self->peers; },
-	[](InstantTensor* self, DeviceInstance& I) -> string { //This example used as a trial to test OpenCL kernel code
-		string content;
-		read_file_content<char>(OpenCL.location + "src/base.cl", content);
-		return content;
-	});
+	[](InstantTensor* self) -> std::vector<Tensor*> { return self->peers; });
 
-	for (int m = M; m >= 32; m /= STEP)
-		for (int n = N; n >= 32; n /= STEP)
-			for (int  k = K; k >= 32; k /= STEP)
-				graph.peers.push_back(new InstantTensor("tiling_" + to_string(m)  + "_" + to_string(n) + "_" + to_string(k), {&x, &w}, {}, [m, n, k, parallel, &result, clblast, cublas, clBLAS, MIOpen, MKL](InstantTensor* self, DeviceInstance& I) {
-					T x = *self->inputs[0];
-					T w = *self->inputs[1];
+	logger << "Compared with ";
+	if (optional<int>("base", true)) {
+		logger << "baseline kernel";
+		baseline = new InstantTensor("base", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto& kernel = prepare_for_running_kernel(self, I);
+			kernel.setArg(0, I.buffers[&result]);
+			kernel.setArg(1, I.buffers[&x]);
+			kernel.setArg(2, I.buffers[&w]);
+			kernel.setArg(3, nullptr);
+			kernel.setArg(4, m);
+			kernel.setArg(5, k);
+			int local_size = find_proper_local_size(k, I.work_group_size);
+			if (local_size > m * n)
+				local_size = m * n;
+			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
+			cl::NDRange global(m * n);
+			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
+			if (!parallel)
+				wait_for_all_kernels_finished(I);
+		}, [](InstantTensor* self, DeviceInstance& I) -> string {
+			string content;
+			read_file_content<char>(OpenCL.location + "src/base.cl", content);
+			return content;
+		});
+		graph.peers.push_back(baseline);
+	}
 
-					if (clblast) {
-						auto status = Gemm<float>(Layout::kColMajor, Transpose::kNo, Transpose::kNo, m, n, k, alpha, I.buffers[&w](), 0, m, I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), &I.events[&result]());
-						if (status != clblast::StatusCode::kSuccess)
-							throw runtime_error("clblast error: " + to_string((int) status));
-						if (!parallel)
-							wait_for_all_kernels_finished(I);
-					}
+	if (optional<int>("clblast", false)) {
+		logger << "clblast";
+		clBLAST = new InstantTensor("clblast", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto status = clblast::Gemm<float>(clblast::Layout::kColMajor, clblast::Transpose::kNo, clblast::Transpose::kNo, m, n, k, alpha, I.buffers[&w](), 0, m, I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), &I.events[&result]());
+			if (status != clblast::StatusCode::kSuccess)
+				throw runtime_error("clblast error: " + to_string((int) status));
+			if (!parallel)
+				wait_for_all_kernels_finished(I);
+		});
+		graph.peers.push_back(clBLAST);
+	}
+
+	if (optional<int>("cublas", false)) {
 #ifdef CUBLAS_ENABLE
-					else if (cublas) {
-						auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, bufA, m, bufB, k, &beta, bufC, m);
-						if (status != CUBLAS_STATUS_SUCCESS)
-							exit(1);
-						if (!parallel)
-							cudaDeviceSynchronize();
-					}
+		logger << "cublas";
+		cublas = new InstantTensor("cublas", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, bufA, m, bufB, k, &beta, bufC, m);
+			if (status != CUBLAS_STATUS_SUCCESS)
+				exit(1);
+			if (!parallel)
+				cudaDeviceSynchronize();
+		});
+		graph.peers.push_back(cublas);
 #endif
-					else if (clBLAS) {
-						auto err = clblasSgemm(clblasColumnMajor, clblasNoTrans, clblasNoTrans, m, n, k, alpha, I.buffers[&w](), 0, m,
-								I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, 1, &I.queue(), 0, NULL, &I.events[&result]());
-						if (err != CL_SUCCESS)
-							throw runtime_error("clBLAS error: " + to_string((int) err));
-						if (!parallel)
-							wait_for_all_kernels_finished(I);
-					}
+	}
+
+	if (optional<int>("clblas", false)) {
+		logger << "clBLAS";
+		auto err = clblasSetup();
+		if (err != CL_SUCCESS)
+			throw runtime_error("clBLAS error: " + to_string((int) err));
+		clBLAS = new InstantTensor("clBLAS", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto err = clblasSgemm(clblasColumnMajor, clblasNoTrans, clblasNoTrans, m, n, k, alpha, I.buffers[&w](), 0, m,
+					I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, 1, &I.queue(), 0, NULL, &I.events[&result]());
+			if (err != CL_SUCCESS)
+				throw runtime_error("clBLAS error: " + to_string((int) err));
+			if (!parallel)
+				wait_for_all_kernels_finished(I);
+		});
+		graph.peers.push_back(clBLAS);
+	}
+
+	if (optional<int>("miopen", false)) {
 #ifdef MIOPENGEMM_ENABLE
-					else if (MIOpen) {
-						auto stat = MIOpenGEMM::gemm0<float>(true, false, false, m, n, k, alpha, I.buffers[&w](), 0, m,
-								I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
-						if (!stat.success)
-							throw runtime_error("MIOpenGemm error: " + to_string(stat.ID));
-						if (!parallel)
-							wait_for_all_kernels_finished(I);
-					}
+		logger << "MIOpenGemm";
+		MIOpen = new InstantTensor("MIOpen", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto stat = MIOpenGEMM::gemm0<float>(true, false, false, m, n, k, alpha, I.buffers[&w](), 0, m,
+					I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
+			if (!stat.success)
+				throw runtime_error("MIOpenGemm error: " + to_string(stat.ID));
+			if (!parallel)
+				wait_for_all_kernels_finished(I);
+		});
+		graph.peers.push_back(MIOpen);
 #endif
+	}
+
+	if (optional<int>("mkl", false)) {
 #ifdef MKL_ENABLE
-					else if (MKL) {
-						cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, I.pointers[&w], m, I.pointers[&x], k, beta, I.pointers[&result], m);
-					}
+		logger << "Intel MKL";
+		MKL = new InstantTensor("MKL", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, I.pointers[&w], m, I.pointers[&x], k, beta, I.pointers[&result], m);
+		});
+		graph.peers.push_back(MKL);
 #endif
-					else {
-						auto& kernel = prepare_for_running_kernel(self, I);
-						kernel.setArg(0, I.buffers[&result]);
-						kernel.setArg(1, I.buffers[&x]);
-						kernel.setArg(2, I.buffers[&w]);
-						kernel.setArg(3, nullptr);
-						kernel.setArg(4, m);
-						kernel.setArg(5, k);
-						int local_size = find_proper_local_size(k, I.work_group_size);
-						if (local_size > m * n)
-							local_size = m * n;
-						const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
-						cl::NDRange global(m, n);
-						I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
-						if (!parallel)
-							wait_for_all_kernels_finished(I);
-					}
-//					operate_tensor_data<float>(&result, I, {0, 0}, {2, 4}, result.dimensions);
-				}, [m, n, k](InstantTensor* self, DeviceInstance& I) -> string {
-					if (cl_build_options.find("-DTS=") == string::npos)
-						cl_build_options += "-DTS=" + to_string(I.work_group_size <= 256? 16 : 32);
-					string content;
-					read_file_content<char>(OpenCL.location + "src/revised.cl", content);
-					return content;
-				}));
+	}
+
+	if (optional<int>("revised", false)) {
+		logger << "revised clNET kernel";
+		revised = new InstantTensor("revised", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto& kernel = prepare_for_running_kernel(self, I);
+			kernel.setArg(0, I.buffers[&result]);
+			kernel.setArg(1, I.buffers[&x]);
+			kernel.setArg(2, I.buffers[&w]);
+			kernel.setArg(3, nullptr);
+			kernel.setArg(4, m);
+			kernel.setArg(5, k);
+			int local_size = find_proper_local_size(k, I.work_group_size);
+			if (local_size > m * n)
+				local_size = m * n;
+			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
+			cl::NDRange global(m, n);
+			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
+			if (!parallel)
+				wait_for_all_kernels_finished(I);
+		}, [](InstantTensor* self, DeviceInstance& I) -> string {
+//			if (cl_build_options.find("-DTS=") == string::npos)
+//				cl_build_options += "-DTS=" + to_string(I.work_group_size <= 256? 16 : 32);
+			string content;
+			read_file_content<char>(OpenCL.location + "src/revised.cl", content);
+//			replace_all(content, "dim_in", to_string(k));
+			return content;
+		});
+		graph.peers.push_back(revised);
+	}
+	logger << ", Verification " << (verify? "enabled" : "disabled");
+	logger << ", Parallel " << (parallel? "enabled" : "disabled");
+	logger << endl;
 
 	return graph;
 }
@@ -379,6 +393,3 @@ int main(int argc, char** argv)
 	OpenCL.run(graph, devices, device_debugger, device_master);
 	return 0;
 }
-
-
-

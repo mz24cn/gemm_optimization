@@ -24,3 +24,4 @@
 *.app
 
 /Release/
+/Debug/

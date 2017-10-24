@@ -1,3 +1,17 @@
+kernel void gemm_unroll(global float* out, const global float* in, const global float* weight, const global float* bias,
+		const int dim_hidden, const int dim_in)
+{
+	const int out_row = get_global_id(0);
+	const int out_column = get_global_id(1);
+	const int in_offset = dim_in * out_column;
+	float z = bias != NULL? bias[out_row] : 0;
+
+//#pragma unroll 8
+	for (int i = 0; i < dim_in; i++)
+		z += weight[dim_hidden * i + out_row] * in[in_offset + i];
+	out[get_global_size(0) * out_column + out_row] = z;
+}
+
 //#define TSM 128                // The tile-size in dimension M
 //#define TSN 128                // The tile-size in dimension N
 //#define TSK 16                 // The tile-size in dimension K
@@ -111,46 +125,46 @@
 //	}
 //}
 
-#define TS 32
-kernel void gemm_version3(global float* out, const global float* in, const global float* weight, const global float* bias, 
-		/*local float* tmp, */const int dim_hidden, const int dim_in)
-{
-	const int row = get_local_id(0); // Local row ID (max: TS)
-	const int col = get_local_id(1); // Local col ID (max: TS)
-	const int globalRow = TS*get_group_id(0) + row; // Row ID of C (0..dim_hidden)
-	const int globalCol = TS*get_group_id(1) + col; // Col ID of C (0..N)
-
-	// Local memory to fit a tile of TS*TS elements of A and B
-	local float Asub[TS][TS];
-	local float Bsub[TS][TS];
-
-	// Initialise the accumulation register
-	float acc = 0.0f;
-
-	// Loop over all tiles
-	const int numTiles = dim_in / TS;
-	for (int t=0; t<numTiles; t++) {
-		// Load one tile of A and B into local memory
-		const int tiledRow = TS*t + row;
-		const int tiledCol = TS*t + col;
-		Asub[col][row] = weight[tiledCol * dim_hidden + globalRow];
-		Bsub[col][row] = in[globalCol * dim_in + tiledRow];
-
-		// Synchronise to make sure the tile is loaded
-		barrier(CLK_LOCAL_MEM_FENCE);
-
-		// Perform the computation for a single tile
-		for (int k=0; k<TS; k++) {
-			acc += Asub[k][row] * Bsub[col][k];
-		}
-
-		// Synchronise before loading the next tile
-		barrier(CLK_LOCAL_MEM_FENCE);
-	}
-
-	// Store the final result in C
-	out[globalCol * dim_hidden + globalRow] = acc;
-}
+//#define TS 32
+//kernel void gemm_version3(global float* out, const global float* in, const global float* weight, const global float* bias, 
+//		/*local float* tmp, */const int dim_hidden, const int dim_in)
+//{
+//	const int row = get_local_id(0); // Local row ID (max: TS)
+//	const int col = get_local_id(1); // Local col ID (max: TS)
+//	const int globalRow = TS*get_group_id(0) + row; // Row ID of C (0..dim_hidden)
+//	const int globalCol = TS*get_group_id(1) + col; // Col ID of C (0..N)
+//
+//	// Local memory to fit a tile of TS*TS elements of A and B
+//	local float Asub[TS][TS];
+//	local float Bsub[TS][TS];
+//
+//	// Initialise the accumulation register
+//	float acc = 0.0f;
+//
+//	// Loop over all tiles
+//	const int numTiles = dim_in / TS;
+//	for (int t=0; t<numTiles; t++) {
+//		// Load one tile of A and B into local memory
+//		const int tiledRow = TS*t + row;
+//		const int tiledCol = TS*t + col;
+//		Asub[col][row] = weight[tiledCol * dim_hidden + globalRow];
+//		Bsub[col][row] = in[globalCol * dim_in + tiledRow];
+//
+//		// Synchronise to make sure the tile is loaded
+//		barrier(CLK_LOCAL_MEM_FENCE);
+//
+//		// Perform the computation for a single tile
+//		for (int k=0; k<TS; k++) {
+//			acc += Asub[k][row] * Bsub[col][k];
+//		}
+//
+//		// Synchronise before loading the next tile
+//		barrier(CLK_LOCAL_MEM_FENCE);
+//	}
+//
+//	// Store the final result in C
+//	out[globalCol * dim_hidden + globalRow] = acc;
+//}
 
 //kernel void gemm_version3(global float* out, const global float* in, const global float* weight, const global float* bias, 
 //		/*local float* tmp, */const int dim_hidden, const int dim_in)
