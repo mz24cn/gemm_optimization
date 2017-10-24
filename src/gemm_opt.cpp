@@ -124,7 +124,7 @@ T gemm_opt()
 					time = MICROS(time);
 					//end timing-----------------------------
 
-					float baseline = time / total / 1000.0f;
+					float baseline = time / 1000.0f / total;
 					if (verify) {
 						result.upload(I);
 						memcpy(result.pointer, I.pointers[&result], m * n * sizeof(float));
@@ -150,7 +150,7 @@ T gemm_opt()
 					time2 = MICROS(time2);
 					//end timing-----------------------------
 
-					float compared = time2 / total / 1000.0f;
+					float compared = time2 / 1000.0f / total;
 					float delta = 0;
 					if (verify) {
 #ifdef CUBLAS_ENABLE
@@ -219,6 +219,8 @@ T gemm_opt()
 								I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, 1, &I.queue(), 0, NULL, &I.events[&result]());
 						if (err != CL_SUCCESS)
 							throw runtime_error("clBLAS error: " + to_string((int) err));
+						if (!parallel)
+							wait_for_all_kernels_finished(I);
 					}
 #ifdef MIOPENGEMM_ENABLE
 					else if (MIOpen) {
@@ -226,6 +228,8 @@ T gemm_opt()
 								I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
 						if (!stat.success)
 							throw runtime_error("MIOpenGemm error: " + to_string(stat.ID));
+						if (!parallel)
+							wait_for_all_kernels_finished(I);
 					}
 #endif
 #ifdef MKL_ENABLE
