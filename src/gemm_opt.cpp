@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <csignal>
+#include <fstream>
 
 #ifdef CUBLAS_ENABLE
 #undef __cdecl
@@ -33,6 +34,12 @@ bool parallel;
 float alpha = 0;
 float beta = 0;
 Tensor *baseline = nullptr, *clBLAS = nullptr, *clBLAST = nullptr, *cublas = nullptr, *MKL = nullptr, *MIOpen = nullptr, *revised = nullptr;
+/*json format:
+ * {"M":M,"N":N,"K":K,"step":step,"repeat":repeat,"alpha":alpha,"beta":beta,"parallel":parallel,"verify":verify,"device","GTX 1050Ti","OS":OS,"date":date,"targets":["clblas","cublas"],
+ * "data":[{"M":m,"N":n,"K":k,"times":times,"base":[time,delta],"clblas":[time,delta],"cublas":[time,delta]},...]}
+ * */
+ofstream* json_file = nullptr;
+char device_name[64];
 
 float* bufA = 0;
 float* bufB = 0;
@@ -68,11 +75,17 @@ T gemm_opt()
 			prepare_cublas(w.pointer, x.pointer, result.pointer, K, M, N);
 #endif
 
+		int i = 0;
 		for (m = M; m >= 32; m /= STEP)
 			for (n = N; n >= 32; n /= STEP)
 				for (k = K; k >= 32; k /= STEP) {
 					int64 total = (sqrt(REPEAT * M * N * K / m / n / k) - 0.8) * 50;
 					logger << "M=" << m << " \tN=" << n << " \tK=" << k << " \ttimes=" << total << flush;
+					if (json_file != nullptr) {
+						if (i++ > 0)
+							*json_file << ",\n";
+						*json_file << "{\"M\":" << m << ",\"N\":" << n << ",\"K\":" << k << ",\"times\":" << total << ",";
+					}
 
 					size_t minimum = INT_MAX, baseline_time = 0;
 					Tensor* minimum_tensor = nullptr;
@@ -101,13 +114,18 @@ T gemm_opt()
 							//end timing-----------------------------
 
 							float each = time / 1000.0f / total;
+							if (tensor == baseline)
+								baseline_time = time;
+							logger << time / 1000.0f << "/" << each;
+							if (json_file != nullptr) {
+								if (minimum_tensor != nullptr)
+									*json_file << ",";
+								*json_file << "\""<<  tensor->alias << "\":[" << time / 1000.0f;// << n << ",\"K\":" << k << ",\"times\":" << total;
+							}
 							if (minimum > time) {
 								minimum = time;
 								minimum_tensor = tensor;
 							}
-							if (tensor == baseline)
-								baseline_time = time;
-							logger << time / 1000.0f << "/" << each;
 							if (verify) {
 								float delta = 0;
 								if (tensor != MKL) //For MKL, data has stored in I.pointers[&result]
@@ -122,10 +140,14 @@ T gemm_opt()
 										delta += diff * diff;
 									}
 									logger << "(delta=" << delta << ")";
+									if (json_file != nullptr)
+										*json_file << "," << delta;
 								}
 							}
 							if (baseline != nullptr)
 								logger << "/" << 1.0f * baseline_time / time;
+							if (json_file != nullptr)
+								*json_file << "]";
 						}
 						catch (cl::Error& e) {
 							logger << (debug? e.what() : "error");
@@ -137,6 +159,8 @@ T gemm_opt()
 					}
 					if (self->peers.size() > 1)
 						logger << " \tWin=" << minimum_tensor->alias;
+					if (json_file != nullptr)
+						*json_file << "}";
 					logger << endl;
 				}
 
@@ -147,13 +171,16 @@ T gemm_opt()
 #endif
 		if (clBLAS != nullptr)
 			clblasTeardown();
+		if (json_file != nullptr) {
+//			json_file->unget(); //remove comma at tail
+			*json_file << "\n],\"rows\":" << i << "}\n";
+			json_file->close();
+		}
 	}, {},
 	[](InstantTensor* self) -> Tensor* { return nullptr; },
 	[](InstantTensor* self) -> std::vector<Tensor*> { return self->peers; });
 
-	logger << "Compared with ";
 	if (optional<int>("base", true)) {
-		logger << "baseline kernel";
 		baseline = new InstantTensor("base", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto& kernel = prepare_for_running_kernel(self, I);
 			kernel.setArg(0, I.buffers[&result]);
@@ -179,7 +206,6 @@ T gemm_opt()
 	}
 
 	if (optional<int>("clblast", false)) {
-		logger << "clblast";
 		clBLAST = new InstantTensor("clblast", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto status = clblast::Gemm<float>(clblast::Layout::kColMajor, clblast::Transpose::kNo, clblast::Transpose::kNo, m, n, k, alpha, I.buffers[&w](), 0, m, I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), &I.events[&result]());
 			if (status != clblast::StatusCode::kSuccess)
@@ -192,7 +218,6 @@ T gemm_opt()
 
 	if (optional<int>("cublas", false)) {
 #ifdef CUBLAS_ENABLE
-		logger << "cublas";
 		cublas = new InstantTensor("cublas", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, bufA, m, bufB, k, &beta, bufC, m);
 			if (status != CUBLAS_STATUS_SUCCESS)
@@ -205,7 +230,6 @@ T gemm_opt()
 	}
 
 	if (optional<int>("clblas", false)) {
-		logger << "clBLAS";
 		auto err = clblasSetup();
 		if (err != CL_SUCCESS)
 			throw runtime_error("clBLAS error: " + to_string((int) err));
@@ -222,7 +246,6 @@ T gemm_opt()
 
 	if (optional<int>("miopen", false)) {
 #ifdef MIOPENGEMM_ENABLE
-		logger << "MIOpenGemm";
 		MIOpen = new InstantTensor("MIOpen", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto stat = MIOpenGEMM::gemm0<float>(true, false, false, m, n, k, alpha, I.buffers[&w](), 0, m,
 					I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
@@ -237,7 +260,6 @@ T gemm_opt()
 
 	if (optional<int>("mkl", false)) {
 #ifdef MKL_ENABLE
-		logger << "Intel MKL";
 		MKL = new InstantTensor("MKL", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			cblas_sgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, m, n, k, alpha, I.pointers[&w], m, I.pointers[&x], k, beta, I.pointers[&result], m);
 		});
@@ -246,7 +268,6 @@ T gemm_opt()
 	}
 
 	if (optional<int>("revised", false)) {
-		logger << "revised clNET kernel";
 		revised = new InstantTensor("revised", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto& kernel = prepare_for_running_kernel(self, I);
 			kernel.setArg(0, I.buffers[&result]);
@@ -273,9 +294,35 @@ T gemm_opt()
 		});
 		graph.peers.push_back(revised);
 	}
+
+	logger << "Comparing " << graph.peers[0]->alias;
+	for (size_t i = 1; i < graph.peers.size(); i++)
+		logger << ", " << graph.peers[i]->alias;
 	logger << ", Verification " << (verify? "enabled" : "disabled");
 	logger << ", Parallel " << (parallel? "enabled" : "disabled");
 	logger << endl;
+
+	string file = optional<string>("json", "");
+	if (!file.empty()) {
+		json_file = new ofstream(file, fstream::out);
+		char date[32];
+		time_t seconds = MICROS(0) / 1000000;
+		tm* day = localtime(&seconds);
+		sprintf(date, "%04d-%02d-%02d", day->tm_year + 1900, day->tm_mon + 1, day->tm_mday);
+#ifdef __WINNT__
+#define OS_name "Windows"
+#elif defined(__APPLE__) || defined(__MACOSX)
+#define OS_name "MacOS"
+#else
+#define OS_name "Linux"
+#endif
+		*json_file << "{\"M\":" << M << ",\"N\":" << N << ",\"K\":" << K << ",\"step\":" << STEP << ",\"repeat\":" << REPEAT << ",\"alpha\":" << alpha << ",\"beta\":" << beta
+				<< ",\"parallel\":" << parallel << ",\"verify\":" << verify << ",\"device\":\"" << device_name << "\",\"OS\":\"" << OS_name << "\",\"date\":\"" << date << "\",\n\"targets\":" << "[";
+		*json_file << "\"" << graph.peers[0]->alias << "\"";
+		for (size_t i = 1; i < graph.peers.size(); i++)
+			*json_file << ",\"" << graph.peers[i]->alias << "\"";
+		*json_file << "],\"data\":[\n";
+	}
 
 	return graph;
 }
@@ -327,7 +374,7 @@ int main(int argc, char** argv)
 		exit(1);
 	});
 
-	OpenCL.location = "/GIT/gemm_optimization/";
+	OpenCL.location = optional<string>("location", "/GIT/gemm_optimization/");
 	bool use_debugger = false, stop_on_startup = false, list_devices = false, display_structure = false, console_output = true, log_to_file = false;
 	vector<int> devices;
 	for (int i = 1; i < argc; i++) {
@@ -383,6 +430,9 @@ int main(int argc, char** argv)
 	int device_master = optional<int>("master", devices[0]);
 	int device_debugger = optional<int>("debugger", use_debugger? devices[0] : -1);
 
+	auto& device = OpenCL.find_devices()[devices[0]];
+	string name = device.getInfo<CL_DEVICE_NAME>();
+	memcpy(device_name, name.c_str(), name.length() + 1); //remove NVIDIA \0 char
 	T graph = gemm_opt();
 	if (list_devices)
 		OpenCL.print_device_info(cout);
