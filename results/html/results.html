@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=2560; height=1440">
+    <title>gemm optimization</title>
+	<script src="jquery-3.1.0.min.js"></script>
+	<script src="knockout-3.4.2.js"></script>
+	<style>
+		table {border-collapse:collapse; border-spacing:0px; line-height:28px; border:0; width:100%}
+		tr {text-align: center}
+		.dim {font-family: Georgia, "Times New Roman", Times, serif}
+		a:link,a:visited {color: #000080; text-decoration: none}
+		a:hover {color: #ff4c00; text-decoration: underline}
+	</style>
+</head>
+<body style="margin: 0">
+	<div>
+		<h2 style="text-align: center">
+		Single Precision Float Matrix Multiplication (gemm) Performance Benchmark
+		</h2>
+		<div style="margin: 10px">
+		<div>Device: <b data-bind="text: device"></b></div>
+		<div>Operation System: <b data-bind="text: OS"></b></div>
+		<div>Data Source: <a id="json" href="" target="_blank"></a></div>
+		<div>Compute: C = alpha * A * B + beta * C, alpha = <b data-bind="text: alpha"></b>, beta = <b data-bind="text: beta"></b></div>
+		<div>Max dimensions: M=<b data-bind="text: M"></b> N=<b data-bind="text: N"></b> K=<b data-bind="text: K"></b>, step down: <b data-bind="text: step"></b></div>
+		<div>Data Layout: A[M][K], B[K][N], C[M][N], Column Major</div>
+		<div>Date: <b data-bind="text: date"></b></div>
+		<div>Time unit: milliseconds</div>
+		</div>
+	    <table>
+	        <tr>
+				<th>No.</th><th>M</th><th>N</th><th>K</th><th>times</th>
+				<!--ko foreach: targets-->
+				<th data-bind="text: $data"></th>
+				<!--/ko-->
+	        </tr>
+			<tbody data-bind="foreach: { data: data, afterRender: setStyle }">
+	        <tr>
+				<td data-bind="text: $index"></td>
+				<td class="dim" data-bind="text: M"></td>
+				<td class="dim" data-bind="text: N"></td>
+				<td class="dim" data-bind="text: K"></td>
+				<td data-bind="text: times"></td>
+				<!--ko foreach: $parent.targets-->
+				<td data-bind="text: $parent[$data][0]"></td>
+				<!--/ko-->
+	        </tr>
+			</tbody>
+	    </table>
+	</div>
+	<script type="text/javascript">
+		var toggle = true;
+		var dataset = window.location.search.substr(1);
+		$.ajax({url: "../" + dataset}).done(function(data) { //GTX1050Ti_Windows_2048_2048_2048
+			var json = $.parseJSON(data);
+			json.setStyle = function(element, index, data) {
+				var css = element[1].cells[index.win + 5].style;
+				css.fontWeight = "bold";
+				css.color = "red";
+				if (toggle)
+					element[1].style.backgroundColor = "#FAFAFA";
+				toggle = !toggle;
+			}
+			
+			var URL = window.location.href.substr(0, window.location.href.lastIndexOf('/', window.location.href.lastIndexOf('/') - 1) + 1) + dataset
+			$("#json").attr("href", URL); 
+			$("#json").text(URL);
+			ko.applyBindings(json);
+		});
+	</script>
+</body>
+</html>

@@ -84,15 +84,18 @@ T gemm_opt()
 					if (json_file != nullptr) {
 						if (i++ > 0)
 							*json_file << ",\n";
-						*json_file << "{\"M\":" << m << ",\"N\":" << n << ",\"K\":" << k << ",\"times\":" << total << ",";
+						*json_file << "{\"M\":" << m << ",\"N\":" << n << ",\"K\":" << k << ",\"times\":" << total;
 					}
 
 					size_t minimum = INT_MAX, baseline_time = 0;
-					Tensor* minimum_tensor = nullptr;
-					for (auto tensor : self->peers) {
+					size_t min_no = 0;
+					for (size_t l = 0; l < self->peers.size(); l++) {
+						auto tensor = self->peers[l];
 						size_t time = 0;
 						try {
 							logger << " \t" << tensor->alias << "=";
+							if (json_file != nullptr)
+								*json_file << ",\""<<  tensor->alias << "\":[";
 							//warm up
 							tensor->run(I);
 							wait_for_all_kernels_finished(I);
@@ -117,14 +120,11 @@ T gemm_opt()
 							if (tensor == baseline)
 								baseline_time = time;
 							logger << time / 1000.0f << "/" << each;
-							if (json_file != nullptr) {
-								if (minimum_tensor != nullptr)
-									*json_file << ",";
-								*json_file << "\""<<  tensor->alias << "\":[" << time / 1000.0f;// << n << ",\"K\":" << k << ",\"times\":" << total;
-							}
+							if (json_file != nullptr)
+								*json_file << time / 1000.0f;
 							if (minimum > time) {
 								minimum = time;
-								minimum_tensor = tensor;
+								min_no = l;
 							}
 							if (verify) {
 								float delta = 0;
@@ -144,23 +144,27 @@ T gemm_opt()
 										*json_file << "," << delta;
 								}
 							}
-							if (baseline != nullptr)
+							if (tensor != baseline)
 								logger << "/" << 1.0f * baseline_time / time;
-							if (json_file != nullptr)
-								*json_file << "]";
 						}
 						catch (cl::Error& e) {
 							logger << (debug? e.what() : "error");
+							if (json_file != nullptr)
+								*json_file << "\"error\"";
 						}
 						catch (runtime_error& e) {
 							logger << (debug? e.what() : "error");
+							if (json_file != nullptr)
+								*json_file << "\"error\"";
 						}
 						logger << flush;
+						if (json_file != nullptr)
+							*json_file << "]";
 					}
 					if (self->peers.size() > 1)
-						logger << " \tWin=" << minimum_tensor->alias;
+						logger << " \tWin=" << self->peers[min_no]->alias;
 					if (json_file != nullptr)
-						*json_file << "}";
+						*json_file << ",\"win\":" << min_no << "}";
 					logger << endl;
 				}
 
