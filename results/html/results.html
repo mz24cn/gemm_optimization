@@ -54,8 +54,9 @@
 		var toggle = true;
 		var dataset = window.location.search.substr(1);
 		$.ajax({url: "../" + dataset}).done(function(data) { //GTX1050Ti_Windows_2048_2048_2048
-			var json = $.parseJSON(data);
-			json.setStyle = function(element, index, data) {
+			if (typeof(data) == "string")
+				data = $.parseJSON(data);
+			data.setStyle = function(element, index, data) {
 				var css = element[1].cells[index.win + 5].style;
 				css.fontWeight = "bold";
 				css.color = "red";
@@ -67,7 +68,7 @@
 			var URL = window.location.href.substr(0, window.location.href.lastIndexOf('/', window.location.href.lastIndexOf('/') - 1) + 1) + dataset
 			$("#json").attr("href", URL); 
 			$("#json").text(URL);
-			ko.applyBindings(json);
+			ko.applyBindings(data);
 		});
 	</script>
 </body>
