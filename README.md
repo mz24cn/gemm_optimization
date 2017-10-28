@@ -8,5 +8,5 @@ The repository targets the gemm function performance optimization. It compares s
 # How to Build
 The repository contains an eclipse CDT project, a Microsoft Visual Studio VC project, and a Linux Makefile. Some package include file and binary library files are included. But it may be incomplete (for example, some Intel MKL runtime libraries for some CPU types). I think it is not difficult to solve such issues for the people who cares gemm optimization.
 # How to Run
-`.\gemm_optimization.exe /1 :clblast 1 :clblas 1 :cublas 1 :mkl 1 :verify 1 :json D:\GTX1050Ti_Windows.json :M 2048 :N 2048 :K 2048 :step 2`
+`.\gemm_optimization.exe /1 :clblast 1 :clblas 1 :cublas 1 :mkl 1 :verify 1 :json D:\GTX1050Ti_Windows.json :M 2048 :N 2048 :K 2048 :step 2`  
 This command line indicates the gemm computing on OpenCL device no. 1, clblast, clblas, NVIDIA cublas, Intel MKL enabled, data correction verification enabled, output data as json file 'D:\GTX1050Ti_Windows.json', the matrix multiplication computing starts from size A\[2048\[2048] \* B\[2048]\[2048], each dimension step down with factor 2 (2048, 1024, 512, ..., etc.).
