@@ -23,12 +23,13 @@
 		<div>Device: <b data-bind="text: device"></b></div>
 		<div>Operation System: <b data-bind="text: OS"></b></div>
 		<div>Data Source: <a id="json" href="" target="_blank"></a></div>
-		<div>Raw Results: <a id="raw" href="" target="_blank"></a></div>
+		<div>Raw Results: <a id="raw" href="" target="raw"></a></div>
 		<div>Compute: C = alpha * A * B + beta * C, alpha = <b data-bind="text: alpha"></b>, beta = <b data-bind="text: beta"></b></div>
 		<div>Max Dimensions: M=<b data-bind="text: M"></b> N=<b data-bind="text: N"></b> K=<b data-bind="text: K"></b>, step down: <b data-bind="text: step"></b></div>
 		<div>Data Layout: A[M][K], B[K][N], C[M][N], Column Major</div>
 		<div>Date: <b data-bind="text: date"></b></div>
 		<div>Time Unit: <b>milliseconds</b></div>
+		<div>Description: each row contains time cost of "times" column times matrix multiplication. &Delta; column is the variance of each type compared with base type.</div>
 		</div>
 	    <table>
 	        <tr>
