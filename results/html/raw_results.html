@@ -23,7 +23,7 @@
 		<div>Device: <b data-bind="text: device"></b></div>
 		<div>Operation System: <b data-bind="text: OS"></b></div>
 		<div>Data Source: <a id="json" href="" target="_blank"></a></div>
-		<div>Raw Results: <a id="raw" href="" target="_blank"></a></div>
+		<div>Abstract Results: <a id="raw" href="" target="_blank"></a></div>
 		<div>Compute: C = alpha * A * B + beta * C, alpha = <b data-bind="text: alpha"></b>, beta = <b data-bind="text: beta"></b></div>
 		<div>Max Dimensions: M=<b data-bind="text: M"></b> N=<b data-bind="text: N"></b> K=<b data-bind="text: K"></b>, step down: <b data-bind="text: step"></b></div>
 		<div>Data Layout: A[M][K], B[K][N], C[M][N], Column Major</div>
@@ -32,9 +32,10 @@
 		</div>
 	    <table>
 	        <tr>
-				<th>No.</th><th>M</th><th>N</th><th>K</th>
+				<th>No.</th><th>M</th><th>N</th><th>K</th><th>times</th>
 				<!--ko foreach: targets-->
 				<th data-bind="text: $data"></th>
+				<th>&Delta;</th>
 				<!--/ko-->
 	        </tr>
 			<tbody data-bind="foreach: { data: data, afterRender: setStyle }">
@@ -43,8 +44,10 @@
 				<td class="dim" data-bind="text: M"></td>
 				<td class="dim" data-bind="text: N"></td>
 				<td class="dim" data-bind="text: K"></td>
+				<td data-bind="text: times"></td>
 				<!--ko foreach: $parent.targets-->
-				<td data-bind="text: ($parent[$data][0]/$parent.times).toFixed(3)"></td>
+				<td data-bind="text: $parent[$data][0]"></td>
+				<td data-bind="text: $parent[$data][1]"></td>
 				<!--/ko-->
 	        </tr>
 			</tbody>
@@ -57,7 +60,7 @@
 			if (typeof(data) == "string")
 				data = $.parseJSON(data);
 			data.setStyle = function(element, index, data) {
-				var css = element[1].cells[index.win + 4].style;
+				var css = element[1].cells[index.win * 2 + 5].style;
 				css.fontWeight = "bold";
 				css.color = "red";
 				if (toggle)
@@ -68,7 +71,7 @@
 			var URL = window.location.href.substr(0, window.location.href.lastIndexOf('/', window.location.href.lastIndexOf('/') - 1) + 1) + dataset
 			$("#json").attr("href", URL); 
 			$("#json").text(URL);
-			URL = "raw_results.html?" + dataset;
+			URL = "results.html?" + dataset;
 			$("#raw").attr("href", URL); 
 			$("#raw").text(URL);
 			ko.applyBindings(data);
