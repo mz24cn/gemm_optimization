@@ -1,7 +1,7 @@
-# gemm(matrix multiplication) optimization ¾ØÕó³Ë·¨ÓÅ»¯
+# gemm(matrix multiplication) optimization çŸ©é˜µä¹˜æ³•ä¼˜åŒ–
 The repository targets the gemm function performance optimization. It compares several libraries clBLAS, clBLAST, MIOpenGemm, Intel MKL(CPU) and cuBLAS(CUDA) on different matrix sizes/vendor's hardwares/OS. Out-of-the-box easy as MSVC, MinGW, Linux(CentOS) x86_64 binary provided.  
-ÔÚ²»Í¬¾ØÕó´óĞ¡/Ó²¼ş/²Ù×÷ÏµÍ³ÏÂ±È½Ï¼¸¸öBLAS¿âµÄsgemmº¯ÊıĞÔÄÜ£¬Ìá¹©binary£¬¿ªºĞ¼´ÓÃ¡£  
-# Some results ²¿·Ö½á¹û
+åœ¨ä¸åŒçŸ©é˜µå¤§å°/ç¡¬ä»¶/æ“ä½œç³»ç»Ÿä¸‹æ¯”è¾ƒå‡ ä¸ªBLASåº“çš„sgemmå‡½æ•°æ€§èƒ½ï¼Œæä¾›binaryï¼Œå¼€ç›’å³ç”¨ã€‚  
+# Some results éƒ¨åˆ†ç»“æœ
 [GPU device GTX1080 (4096~32) \* (4096~32) \* (4096~32) on Windows](https://mz24cn.github.io/gemm_optimization/results/html/results.html?GTX1080_4096_4096_4096.json)  
 [GPU device GTX1050Ti (2048~32) \* (2048~32) \* (2048~32) on Windows](https://mz24cn.github.io/gemm_optimization/results/html/results.html?GTX1050Ti_2048_2048_2048.json)  
 [GPU device R9 290X (2048~32) \* (2048~32) \* (2048~32) on Windows](https://mz24cn.github.io/gemm_optimization/results/html/results.html?Hawaii_2048_2048_2048.json)  
