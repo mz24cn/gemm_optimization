@@ -40,6 +40,7 @@ Tensor *baseline = nullptr, *clBLAS = nullptr, *clBLAST = nullptr, *cublas = nul
  * */
 ofstream* json_file = nullptr;
 char device_name[64];
+vector<cl::Event> all_events;
 
 float* bufA = 0;
 float* bufB = 0;
@@ -48,9 +49,28 @@ float* bufC = 0;
 cublasHandle_t handle;
 #endif
 
+struct MyInitializer : Tensor, type::Structured {
+	virtual void run(DeviceInstance& I) override {
+		for (auto tensor : peers) {
+			int i = 1;
+			for (float *p = tensor->pointer, *end = p + tensor->volume; p < end; p++)
+				*p = (float) i;//++;
+		}
+		std::vector<cl::Event> no_precondictions;
+		for (auto tensor : peers) {
+			memcpy(I.pointers[tensor], tensor->pointer, tensor->size);
+			tensor->download(I, &no_precondictions);
+		}
+	}
+	virtual std::vector<Tensor*> auxiliaries() override {
+		return peers;
+	}
+};
+
 T gemm_opt()
 {
 	T initializer = XavierNormalDistributionInitializer({}, 0, 2.34f);
+//	T initializer = *new MyInitializer;
 	int M = optional<int>("M", 2048); //dim_hidden
 	int N = optional<int>("N", 512); //batch_size
 	int K = optional<int>("K", 2048); //dim_in
@@ -91,14 +111,19 @@ T gemm_opt()
 					size_t min_no = 0;
 					for (size_t l = 0; l < self->peers.size(); l++) {
 						auto tensor = self->peers[l];
-						size_t time = 0;
+						size_t time;
 						try {
 							logger << " \t" << tensor->alias << "=";
 							if (json_file != nullptr)
 								*json_file << ",\""<<  tensor->alias << "\":[";
+							if (verify) {
+								memset(I.pointers[&result], 0, result.size);
+								result.download(I); //clear memory for preventing incorrect result report
+							}
 							//warm up
 							tensor->run(I);
 							wait_for_all_kernels_finished(I);
+							all_events.clear();
 
 							//timing the standard version now......
 							time = MICROS(0);
@@ -111,7 +136,8 @@ T gemm_opt()
 								else
 #endif
 								if (tensor != MKL)
-									wait_for_all_kernels_finished(I);
+									for (auto& event : all_events)
+										event.wait();
 							}
 							time = MICROS(time);
 							//end timing-----------------------------
@@ -128,6 +154,11 @@ T gemm_opt()
 							}
 							if (verify) {
 								float delta = 0;
+#ifdef CUBLAS_ENABLE
+								if (tensor == cublas)
+									cudaMemcpy((void*)I.pointers[&result], (void*)bufC, result.size, cudaMemcpyDeviceToHost);
+								else
+#endif
 								if (tensor != MKL) //For MKL, data has stored in I.pointers[&result]
 									result.upload(I);
 //								operate_tensor_data<float>(&result, I, {0, 0}, result.dimensions, result.dimensions, "1"); //check the value details
@@ -148,7 +179,7 @@ T gemm_opt()
 								logger << "/" << 1.0f * baseline_time / time;
 						}
 						catch (cl::Error& e) {
-							logger << (debug? e.what() : "error");
+							logger << (debug? string(e.what()) + "(" + clErrorCodeDescriptions[-e.err()] + ")" : "error");
 							if (json_file != nullptr)
 								*json_file << "\"error\"";
 						}
@@ -197,9 +228,11 @@ T gemm_opt()
 			if (local_size > m * n)
 				local_size = m * n;
 			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
-			cl::NDRange global(m * n);
+			cl::NDRange global(m, n);
 			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
-			if (!parallel)
+			if (parallel)
+				all_events.push_back(I.events[&result]);
+			else
 				wait_for_all_kernels_finished(I);
 		}, [](InstantTensor* self, DeviceInstance& I) -> string {
 			string content;
@@ -209,12 +242,55 @@ T gemm_opt()
 		graph.peers.push_back(baseline);
 	}
 
+	if (optional<int>("revised", false)) {
+		int GroupSizeM = optional<int>("GroupSizeM", 16);
+		int GroupSizeN = optional<int>("GroupSizeN", 16);
+		int TileK = optional<int>("TileK", 16);
+		int LoadM = optional<int>("LoadM", 8);
+		int LoadN = optional<int>("LoadN", 8);
+		int WIDTH = optional<int>("WIDTH", 1);
+		revised = new InstantTensor("revised", {}, {}, [debug, LoadM, LoadN, GroupSizeM, GroupSizeN, &x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto& kernel = prepare_for_running_kernel(self, I);
+			kernel.setArg(0, I.buffers[&result]);
+			kernel.setArg(1, I.buffers[&x]);
+			kernel.setArg(2, I.buffers[&w]);
+//			kernel.setArg(3, nullptr);
+			kernel.setArg(3, n);
+			kernel.setArg(4, m);
+			kernel.setArg(5, k);
+//			int local_size = find_proper_local_size(k, I.work_group_size);
+//			if (local_size > m * n)
+//				local_size = m * n;
+//			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
+			const auto& local = cl::NDRange(GroupSizeM, GroupSizeN);
+			cl::NDRange global(m / LoadM, n / LoadN);
+			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
+			if (parallel)
+				all_events.push_back(I.events[&result]);
+			else
+				wait_for_all_kernels_finished(I);
+			if (debug)
+				operate_tensor_data<float>(&result, I, {0, 0}, {17, 17}, result.dimensions); //check the value details
+		}, [LoadM, LoadN, GroupSizeM, GroupSizeN, TileK, WIDTH](InstantTensor* self, DeviceInstance& I) -> string {
+			if (cl_build_options.find("-DGroupSizeM=") == string::npos)
+				cl_build_options += " -DGroupSizeM=" + to_string(GroupSizeM) + " -DGroupSizeN=" + to_string(GroupSizeN) + " -DTileK=" + to_string(TileK) + " -DLoadM=" + to_string(LoadM)
+				+ " -DLoadN=" + to_string(LoadN) + " -DWIDTH=" + to_string(WIDTH);
+			string content;
+			read_file_content<char>(OpenCL.location + "src/revised.cl", content);
+//			replace_all(content, "dim_in", to_string(k));
+			return content;
+		});
+		graph.peers.push_back(revised);
+	}
+
 	if (optional<int>("clblast", false)) {
 		clBLAST = new InstantTensor("clblast", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto status = clblast::Gemm<float>(clblast::Layout::kColMajor, clblast::Transpose::kNo, clblast::Transpose::kNo, m, n, k, alpha, I.buffers[&w](), 0, m, I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), &I.events[&result]());
 			if (status != clblast::StatusCode::kSuccess)
 				throw runtime_error("clblast error: " + to_string((int) status));
-			if (!parallel)
+			if (parallel)
+				all_events.push_back(I.events[&result]);
+			else
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(clBLAST);
@@ -242,7 +318,9 @@ T gemm_opt()
 					I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, 1, &I.queue(), 0, NULL, &I.events[&result]());
 			if (err != CL_SUCCESS)
 				throw runtime_error("clBLAS error: " + to_string((int) err));
-			if (!parallel)
+			if (parallel)
+				all_events.push_back(I.events[&result]);
+			else
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(clBLAS);
@@ -255,7 +333,9 @@ T gemm_opt()
 					I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), 0, NULL, &I.events[&result]());
 			if (!stat.success)
 				throw runtime_error("MIOpenGemm error: " + to_string(stat.ID));
-			if (!parallel)
+			if (parallel)
+				all_events.push_back(I.events[&result]);
+			else
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(MIOpen);
@@ -269,34 +349,6 @@ T gemm_opt()
 		});
 		graph.peers.push_back(MKL);
 #endif
-	}
-
-	if (optional<int>("revised", false)) {
-		revised = new InstantTensor("revised", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
-			auto& kernel = prepare_for_running_kernel(self, I);
-			kernel.setArg(0, I.buffers[&result]);
-			kernel.setArg(1, I.buffers[&x]);
-			kernel.setArg(2, I.buffers[&w]);
-			kernel.setArg(3, nullptr);
-			kernel.setArg(4, m);
-			kernel.setArg(5, k);
-			int local_size = find_proper_local_size(k, I.work_group_size);
-			if (local_size > m * n)
-				local_size = m * n;
-			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
-			cl::NDRange global(m, n);
-			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
-			if (!parallel)
-				wait_for_all_kernels_finished(I);
-		}, [](InstantTensor* self, DeviceInstance& I) -> string {
-//			if (cl_build_options.find("-DTS=") == string::npos)
-//				cl_build_options += "-DTS=" + to_string(I.work_group_size <= 256? 16 : 32);
-			string content;
-			read_file_content<char>(OpenCL.location + "src/revised.cl", content);
-//			replace_all(content, "dim_in", to_string(k));
-			return content;
-		});
-		graph.peers.push_back(revised);
 	}
 
 	logger << "Comparing " << graph.peers[0]->alias;
@@ -328,6 +380,8 @@ T gemm_opt()
 		*json_file << "],\"data\":[\n";
 	}
 
+//	if (debug)
+//		return *new InstantTensor("debug", {&graph}, vector<Tensor*>());
 	return graph;
 }
 
