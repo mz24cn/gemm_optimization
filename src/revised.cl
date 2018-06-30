@@ -4,7 +4,7 @@
 //#define GroupSizeN 16
 //#define TileK 16
 __attribute__((reqd_work_group_size(GroupSizeM, GroupSizeN, 1)))
-kernel void gemm_first(global float* C, const global float* B, const global float* A, const int N, const int M, const int K)
+kernel void gemm_GroupSizeM_GroupSizeN_LoadM_LoadN_TileK(global float* C, const global float* B, const global float* A, const int N, const int M, const int K)
 {
 	const int ml = get_local_id(0);
 	const int nl = get_local_id(1);

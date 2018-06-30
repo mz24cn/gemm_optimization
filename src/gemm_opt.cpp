@@ -14,11 +14,16 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #endif
+
+#ifndef BLAS_LIB_DISABLE
 #include <clblast.h>
 #include <clBLAS.h>
+#endif
+
 #ifdef MIOPENGEMM_ENABLE
 #include <miopengemm/gemm.hpp>
 #endif
+
 #ifdef MKL_ENABLE
 #include <mkl.h>
 #endif
@@ -29,11 +34,11 @@
 using namespace std;
 using namespace clnet;
 
-int m, n, k;
+int m, n, k, no;
 bool parallel;
 float alpha = 0;
 float beta = 0;
-Tensor *baseline = nullptr, *clBLAS = nullptr, *clBLAST = nullptr, *cublas = nullptr, *MKL = nullptr, *MIOpen = nullptr, *revised = nullptr;
+Tensor *baseline = nullptr, *clBLAS = nullptr, *clBLAST = nullptr, *cublas = nullptr, *MKL = nullptr, *MIOpen = nullptr, *revised = nullptr, *clnet_tensor = nullptr;
 /*json format:
  * {"M":M,"N":N,"K":K,"step":step,"repeat":repeat,"alpha":alpha,"beta":beta,"parallel":parallel,"verify":verify,"device","GTX 1050Ti","OS":OS,"date":date,"targets":["clblas","cublas"],
  * "data":[{"M":m,"N":n,"K":k,"times":times,"base":[time,delta],"clblas":[time,delta],"cublas":[time,delta]},...]}
@@ -74,6 +79,7 @@ T gemm_opt()
 	int M = optional<int>("M", 2048); //dim_hidden
 	int N = optional<int>("N", 512); //batch_size
 	int K = optional<int>("K", 2048); //dim_in
+	int B = optional<int>("bottom", 32); //bottom
 	int STEP = optional<int>("step", 4);
 
 	alpha = optional<double>("alpha", 1.0);
@@ -84,11 +90,11 @@ T gemm_opt()
 	bool verify = optional<int>("verify", false);
 	bool debug = optional<int>("debug", false);
 
-	T w = Weight({M, K}, "w", &initializer);
+	T w = Weight({K, M}, "w", &initializer);
 	T x = Data({N, K}, &initializer, "x");
 	T result = Data({M, N}, nullptr, "gemm");
 	T graph = *new InstantTensor("gemm_loop_tester", {&x, &w},
-		[M, N, K, STEP, REPEAT, &x, &w, &result, &initializer, verify, debug](InstantTensor* self, DeviceInstance& I) {
+		[M, N, K, B, STEP, REPEAT, &x, &w, &result, &initializer, verify, debug](InstantTensor* self, DeviceInstance& I) {
 #ifdef CUBLAS_ENABLE
 		extern void prepare_cublas(float* A, float* B, float* C, int K, int M, int N);
 		if (cublas)
@@ -96,10 +102,11 @@ T gemm_opt()
 #endif
 
 		int i = 0;
-		for (m = M; m >= 32; m /= STEP)
-			for (n = N; n >= 32; n /= STEP)
-				for (k = K; k >= 32; k /= STEP) {
-					int64 total = (sqrt(REPEAT * M * N * K / m / n / k) - 0.8) * 50;
+		no = 0;
+		for (m = M; m >= B; m /= STEP)
+			for (n = N; n >= B; n /= STEP)
+				for (k = K; k >= B; k /= STEP) {
+					int64 total = debug? 1 : (sqrt(REPEAT * M * N * K / m / n / k) - 0.8) * 50;
 					logger << "M=" << m << " \tN=" << n << " \tK=" << k << " \ttimes=" << total << flush;
 					if (json_file != nullptr) {
 						if (i++ > 0)
@@ -159,11 +166,15 @@ T gemm_opt()
 									cudaMemcpy((void*)I.pointers[&result], (void*)bufC, result.size, cudaMemcpyDeviceToHost);
 								else
 #endif
-								if (tensor != MKL) //For MKL, data has stored in I.pointers[&result]
+								if (tensor == clnet_tensor) {
+									clnet_tensor->peers[no]->upload(I);
+									memcpy(I.pointers[&result], I.pointers[clnet_tensor->peers[no]], clnet_tensor->peers[no]->size);
+								}
+								else if (tensor != MKL) //For MKL, data has stored in I.pointers[&result]
 									result.upload(I);
 //								operate_tensor_data<float>(&result, I, {0, 0}, result.dimensions, result.dimensions, "1"); //check the value details
 								if (tensor == baseline)
-									memcpy(result.pointer, I.pointers[&result], m * n * sizeof(float));
+									memcpy(result.pointer, I.pointers[&result], result.size);
 								else {
 									auto p1 = result.pointer, p2 = I.pointers[&result];
 									for (int j = 0; j < m * n; j ++, p1++, p2++) { //validiate the correction
@@ -197,15 +208,42 @@ T gemm_opt()
 					if (json_file != nullptr)
 						*json_file << ",\"win\":" << min_no << "}";
 					logger << endl;
+					no++;
 				}
+
+//-------------------------------------
+//		const auto& context = I.queue.getInfo<CL_QUEUE_CONTEXT>();
+//		cl::Image2D imageA(context, CL_MEM_READ_ONLY, cl::ImageFormat(CL_DEPTH, CL_FLOAT), M, K, 0);
+//		cl::Image2D imageB(I.queue.getInfo<CL_QUEUE_CONTEXT>(), CL_MEM_READ_ONLY, cl::ImageFormat(CL_DEPTH, CL_FLOAT), K, N, 0);
+////		cl::Image2D imageC(I.queue.getInfo<CL_QUEUE_CONTEXT>(), CL_MEM_READ_ONLY, cl::ImageFormat(CL_DEPTH, CL_FLOAT), M, N, 0);
+//		auto& kernel = prepare_for_running_kernel(self, I);
+//		kernel.setArg(0, I.buffers[&result]);
+//		kernel.setArg(1, imageB);
+//		kernel.setArg(2, imageA);
+//		n = N; m = M; k = K;
+//		kernel.setArg(3, n);
+//		kernel.setArg(4, m);
+//		kernel.setArg(5, k);
+//		const auto& local = cl::NDRange(16, 16);
+//		cl::NDRange global(m / 8, n / 8);
+//		auto time = MICROS(0);
+//		for (int r = 0; r < 9; r++) {
+//			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
+//			wait_for_all_kernels_finished(I);
+//		}
+//		time = MICROS(time);
+//		logger << "Image:" << time << endl;
+//-------------------------------------
 
 #ifdef CUBLAS_ENABLE
 		extern void shutdown_cublas();
 		if (cublas != nullptr)
 			shutdown_cublas();
 #endif
+#ifndef BLAS_LIB_DISABLE
 		if (clBLAS != nullptr)
 			clblasTeardown();
+#endif
 		if (json_file != nullptr) {
 //			json_file->unget(); //remove comma at tail
 			*json_file << "\n],\"rows\":" << i << "}\n";
@@ -213,7 +251,8 @@ T gemm_opt()
 		}
 	}, {},
 	[](InstantTensor* self) -> Tensor* { return nullptr; },
-	[](InstantTensor* self) -> std::vector<Tensor*> { return self->peers; });
+	[](InstantTensor* self) -> std::vector<Tensor*> { return self->peers; }
+	);
 
 	if (optional<int>("base", true)) {
 		baseline = new InstantTensor("base", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
@@ -228,7 +267,7 @@ T gemm_opt()
 			if (local_size > m * n)
 				local_size = m * n;
 			const auto& local = I.work_group_size <= 256? cl::NDRange(16, 16) : cl::NDRange(32, 32);
-			cl::NDRange global(m, n);
+			cl::NDRange global(m * n);
 			I.queue.enqueueNDRangeKernel(kernel, cl::NullRange, global, local/*cl::NullRange*/, &I.precondition_events, &I.events[&result]);
 			if (parallel)
 				all_events.push_back(I.events[&result]);
@@ -240,6 +279,31 @@ T gemm_opt()
 			return content;
 		});
 		graph.peers.push_back(baseline);
+	}
+
+	if (optional<int>("clnet", false)) {
+		clnet_tensor = new InstantTensor("clnet", {}, {}, [&result, &x, &w](InstantTensor* self, DeviceInstance& I) {
+			auto output = self->peers[no];
+			auto x_ = output->inputs[0]->inputs[0];
+			auto w_ = output->inputs[0]->inputs[1];
+			I.events[x_] = I.events[w_] = I.events[&x];
+			output->inputs[0]->run(I);
+			if (parallel)
+				all_events.push_back(I.events[output]);
+			else
+				wait_for_all_kernels_finished(I);
+		});
+		no = 0;
+		for (m = M; m >= B; m /= STEP)
+			for (n = N; n >= B; n /= STEP)
+				for (k = K; k >= B; k /= STEP) {
+					T x_ = Reshape(x, {n, k});
+					T w_ = Reshape(w, {k, m});
+					T output = FullyConnectedLayer(x_, w_, nullptr, "", "clnet_FC");
+					clnet_tensor->peers.push_back(&output);
+					no++;
+				}
+		graph.peers.push_back(clnet_tensor);
 	}
 
 	if (optional<int>("revised", false)) {
@@ -280,10 +344,20 @@ T gemm_opt()
 //			replace_all(content, "dim_in", to_string(k));
 			return content;
 		});
+//		auto kernel = new InstantTensor("revised_kernel", {}, {}, [](InstantTensor* self, DeviceInstance& I) {}, [LoadM, LoadN, GroupSizeM, GroupSizeN, TileK, WIDTH](InstantTensor* self, DeviceInstance& I) -> string {
+//			if (cl_build_options.find("-DGroupSizeM=") == string::npos)
+//				cl_build_options += " -DGroupSizeM=" + to_string(GroupSizeM) + " -DGroupSizeN=" + to_string(GroupSizeN) + " -DTileK=" + to_string(TileK) + " -DLoadM=" + to_string(LoadM)
+//				+ " -DLoadN=" + to_string(LoadN) + " -DWIDTH=" + to_string(WIDTH);
+//			string content;
+//			read_file_content<char>(OpenCL.location + "src/revised.cl", content);
+////			replace_all(content, "dim_in", to_string(k));
+//			return content;
+//		});
 		graph.peers.push_back(revised);
 	}
 
 	if (optional<int>("clblast", false)) {
+#ifndef BLAS_LIB_DISABLE
 		clBLAST = new InstantTensor("clblast", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
 			auto status = clblast::Gemm<float>(clblast::Layout::kColMajor, clblast::Transpose::kNo, clblast::Transpose::kNo, m, n, k, alpha, I.buffers[&w](), 0, m, I.buffers[&x](), 0, k, beta, I.buffers[&result](), 0, m, &I.queue(), &I.events[&result]());
 			if (status != clblast::StatusCode::kSuccess)
@@ -294,22 +368,11 @@ T gemm_opt()
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(clBLAST);
-	}
-
-	if (optional<int>("cublas", false)) {
-#ifdef CUBLAS_ENABLE
-		cublas = new InstantTensor("cublas", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
-			auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, bufA, m, bufB, k, &beta, bufC, m);
-			if (status != CUBLAS_STATUS_SUCCESS)
-				exit(1);
-			if (!parallel)
-				cudaDeviceSynchronize();
-		});
-		graph.peers.push_back(cublas);
 #endif
 	}
 
 	if (optional<int>("clblas", false)) {
+#ifndef BLAS_LIB_DISABLE
 		auto err = clblasSetup();
 		if (err != CL_SUCCESS)
 			throw runtime_error("clBLAS error: " + to_string((int) err));
@@ -324,6 +387,7 @@ T gemm_opt()
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(clBLAS);
+#endif
 	}
 
 	if (optional<int>("miopen", false)) {
@@ -339,6 +403,19 @@ T gemm_opt()
 				wait_for_all_kernels_finished(I);
 		});
 		graph.peers.push_back(MIOpen);
+#endif
+	}
+
+	if (optional<int>("cublas", false)) {
+#ifdef CUBLAS_ENABLE
+		cublas = new InstantTensor("cublas", {}, {}, [&x, &w, &result](InstantTensor* self, DeviceInstance& I) {
+			auto status = cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, bufA, m, bufB, k, &beta, bufC, m);
+			if (status != CUBLAS_STATUS_SUCCESS)
+				exit(1);
+			if (!parallel)
+				cudaDeviceSynchronize();
+		});
+		graph.peers.push_back(cublas);
 #endif
 	}
 

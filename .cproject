@@ -34,6 +34,7 @@
 									<listOptionValue builtIn="false" value="MIOPENGEMM_ENABLE"/>
 									<listOptionValue builtIn="false" value="MKL_ENABLE"/>
 								</option>
+								<option id="gnu.cpp.compiler.option.dialect.std.853513196" superClass="gnu.cpp.compiler.option.dialect.std" useByScannerDiscovery="true" value="gnu.cpp.compiler.dialect.c++1y" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.1628754465" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug.2058989338" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug">
@@ -45,6 +46,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug.854680310" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.debug">
 								<option id="gnu.cpp.link.option.paths.1554225535" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib}&quot;"/>
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib/debug_win}&quot;"/>
 								</option>
 								<option id="gnu.cpp.link.option.libs.2083591947" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
 									<listOptionValue builtIn="false" srcPrefixMapping="" srcRootPath="" value="OpenCLNet"/>
@@ -121,6 +123,7 @@
 									<listOptionValue builtIn="false" value="MIOPENGEMM_ENABLE"/>
 									<listOptionValue builtIn="false" value="CUBLAS_ENABLE"/>
 								</option>
+								<option id="gnu.cpp.compiler.option.dialect.std.59914336" superClass="gnu.cpp.compiler.option.dialect.std" value="gnu.cpp.compiler.dialect.default" valueType="enumerated"/>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.2096357213" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.release.1100536042" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.release">
@@ -131,6 +134,7 @@
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release.1382533207" name="MinGW C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.mingw.exe.release"/>
 							<tool id="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release.1945276392" name="MinGW C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.mingw.exe.release">
 								<option id="gnu.cpp.link.option.paths.678952114" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" useByScannerDiscovery="false" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib/windows}&quot;"/>
 									<listOptionValue builtIn="false" value="&quot;${workspace_loc:/gemm_optimization/lib}&quot;"/>
 								</option>
 								<option id="gnu.cpp.link.option.libs.974022051" name="Libraries (-l)" superClass="gnu.cpp.link.option.libs" useByScannerDiscovery="false" valueType="libs">
@@ -175,27 +179,48 @@
 			</storageModule>
 			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
 		</cconfiguration>
+		<cconfiguration id="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889">
+			<storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889" moduleId="org.eclipse.cdt.core.settings" name="ReleaseARM">
+				<externalSettings/>
+				<extensions>
+					<extension id="org.eclipse.cdt.core.ELF" point="org.eclipse.cdt.core.BinaryParser"/>
+					<extension id="org.eclipse.cdt.core.GASErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GLDErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GCCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.GmakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.MakeErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.VCErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.core.CWDLocator" point="org.eclipse.cdt.core.ErrorParser"/>
+					<extension id="org.eclipse.cdt.autotools.core.ErrorParser" point="org.eclipse.cdt.core.ErrorParser"/>
+				</extensions>
+			</storageModule>
+			<storageModule moduleId="cdtBuildSystem" version="4.0.0">
+				<configuration artifactName="${ProjName}" buildArtefactType="org.eclipse.cdt.build.core.buildArtefactType.exe" buildProperties="org.eclipse.cdt.build.core.buildArtefactType=org.eclipse.cdt.build.core.buildArtefactType.exe,org.eclipse.cdt.build.core.buildType=org.eclipse.cdt.build.core.buildType.release" cleanCommand="rm -rf" description="" id="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889" name="ReleaseARM" parent="cdt.managedbuild.config.gnu.mingw.exe.release">
+					<folderInfo id="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889." name="/" resourcePath="">
+						<toolChain id="com.arm.eclipse.cdt.managedbuild.ds5.gcc.toolchain.1023282669" name="DS-5 GCC">
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.arm.eclipse.cdt.managedbuild.ds5.gcc.target.platform.base.1857757265" name="%target" osList="linux"/>
+							<builder buildPath="${workspace_loc:/gemm_optimization}/ReleaseARM" id="org.eclipse.cdt.build.core.internal.builder.1527494029" keepEnvironmentInBuildfile="false" name="CDT Internal Builder" superClass="org.eclipse.cdt.build.core.internal.builder"/>
+						</toolChain>
+					</folderInfo>
+					<folderInfo id="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.include" name="/" resourcePath="include">
+						<toolChain id="com.arm.eclipse.cdt.managedbuild.ds5.gcc.toolchain.1339133320" name="DS-5 GCC">
+							<targetPlatform archList="all" binaryParser="org.eclipse.cdt.core.ELF" id="com.arm.eclipse.cdt.managedbuild.ds5.gcc.target.platform.base" name="%target" osList="linux"/>
+						</toolChain>
+					</folderInfo>
+				</configuration>
+			</storageModule>
+			<storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+		</cconfiguration>
 	</storageModule>
 	<storageModule moduleId="cdtBuildSystem" version="4.0.0">
 		<project id="gemm_optimization.cdt.managedbuild.target.gnu.mingw.exe.1288322866" name="Executable" projectType="cdt.managedbuild.target.gnu.mingw.exe"/>
 	</storageModule>
-	<storageModule moduleId="scannerConfiguration">
-		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.debug.618261193;cdt.managedbuild.config.gnu.mingw.exe.debug.618261193.;cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.debug.535861977;cdt.managedbuild.tool.gnu.cpp.compiler.input.1628754465">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.debug.618261193;cdt.managedbuild.config.gnu.mingw.exe.debug.618261193.;cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug.2058989338;cdt.managedbuild.tool.gnu.c.compiler.input.2080272085">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.;cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.release.1100536042;cdt.managedbuild.tool.gnu.c.compiler.input.1369803050">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
-		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.;cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.release.190134020;cdt.managedbuild.tool.gnu.cpp.compiler.input.2096357213">
-			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
-		</scannerConfigBuildInfo>
-	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
 	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="ReleaseARM"/>
+		<configuration configurationName="ReleaseARM32">
+			<resource resourceType="PROJECT" workspacePath="/gemm_optimization"/>
+		</configuration>
 		<configuration configurationName="Debug">
 			<resource resourceType="PROJECT" workspacePath="/gemm_optimization"/>
 		</configuration>
@@ -204,4 +229,44 @@
 		</configuration>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+	<storageModule moduleId="scannerConfiguration">
+		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148.;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.c.compiler.1022843461;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.c.compiler.input.2089307947">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.arm.managedbuilder.gcc.ARMGCCDiscoveryProfileC"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.;cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.release.1100536042;cdt.managedbuild.tool.gnu.c.compiler.input.1369803050">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.c.compiler.1335066151;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.c.compiler.input.2095914285">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.arm.managedbuilder.gcc.ARMGCCDiscoveryProfileC"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148.;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.cpp.compiler.1541830748;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.cpp.compiler.input.285108966">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.arm.managedbuilder.gcc.ARMGCCDiscoveryProfileCPP"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148.;cdt.managedbuild.tool.gnu.cross.cpp.compiler.1697476144;cdt.managedbuild.tool.gnu.cpp.compiler.input.494735582">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.debug.618261193;cdt.managedbuild.config.gnu.mingw.exe.debug.618261193.;cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.debug.535861977;cdt.managedbuild.tool.gnu.cpp.compiler.input.1628754465">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.debug.618261193;cdt.managedbuild.config.gnu.mingw.exe.debug.618261193.;cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.debug.2058989338;cdt.managedbuild.tool.gnu.c.compiler.input.2080272085">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.cpp.compiler.113067643;com.arm.eclipse.cdt.managedbuild.ds5.gcc.tool.cpp.compiler.input.1464389344">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId="com.arm.managedbuilder.gcc.ARMGCCDiscoveryProfileCPP"/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.;cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.release.190134020;cdt.managedbuild.tool.gnu.cpp.compiler.input.2096357213">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.;cdt.managedbuild.tool.gnu.cpp.compiler.mingw.exe.release.1725515575;cdt.managedbuild.tool.gnu.cpp.compiler.input.2145760121">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.;cdt.managedbuild.tool.gnu.c.compiler.mingw.exe.release.494706399;cdt.managedbuild.tool.gnu.c.compiler.input.471776804">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148;cdt.managedbuild.config.gnu.mingw.exe.release.1515551852.742405889.772047148.;cdt.managedbuild.tool.gnu.cross.c.compiler.2101343367;cdt.managedbuild.tool.gnu.c.compiler.input.1732019172">
+			<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
+		</scannerConfigBuildInfo>
+	</storageModule>
+	<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cproject>
