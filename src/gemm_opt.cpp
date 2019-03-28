@@ -74,7 +74,7 @@ struct MyInitializer : Tensor, type::Structured {
 
 T gemm_opt()
 {
-	T initializer = XavierNormalDistributionInitializer({}, 0, 2.34f);
+	T initializer = GeneralInitializer({});
 //	T initializer = *new MyInitializer;
 	int M = optional<int>("M", 2048); //dim_hidden
 	int N = optional<int>("N", 512); //batch_size
